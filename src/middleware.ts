@@ -27,14 +27,24 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  const publicPaths = ['/', '/login', '/onboarding']
-  const isPublic = publicPaths.some(p => pathname === p || pathname.startsWith('/onboarding'))
+  // Always allow these paths
+  if (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api')
+  ) {
+    return response
+  }
 
-  if (!user && !isPublic) {
+  // Not logged in — send to login
+  if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && pathname === '/login') {
+  // Logged in and trying to access login — redirect by role
+  if (pathname === '/login') {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, onboarding_complete')
@@ -44,12 +54,8 @@ export async function middleware(request: NextRequest) {
     if (!profile?.onboarding_complete) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
     }
-    if (profile?.role === 'super_admin') {
-      return NextResponse.redirect(new URL('/super', request.url))
-    }
-    if (profile?.role === 'head' || profile?.role === 'supervisor') {
-      return NextResponse.redirect(new URL('/admin', request.url))
-    }
+    if (profile?.role === 'super_admin') return NextResponse.redirect(new URL('/super', request.url))
+    if (profile?.role === 'head' || profile?.role === 'supervisor') return NextResponse.redirect(new URL('/admin', request.url))
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
