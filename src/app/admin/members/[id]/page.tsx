@@ -19,6 +19,8 @@ export default function MemberDetailPage() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [statusUpdate, setStatusUpdate] = useState('')
+  const [roleUpdate, setRoleUpdate] = useState('')
+  const [roleSaving, setRoleSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -57,6 +59,16 @@ export default function MemberDetailPage() {
     const supabase = createClient()
     await supabase.from('probation_cases').update({ status: statusUpdate }).eq('id', probation.id)
     await loadData()
+  }
+
+  async function updateRole() {
+    if (!roleUpdate) return
+    setRoleSaving(true)
+    const supabase = createClient()
+    await supabase.from('profiles').update({ role: roleUpdate }).eq('id', id)
+    await loadData()
+    setRoleSaving(false)
+    setRoleUpdate('')
   }
 
   const attPct = attendance.length > 0 ? Math.round((attendance.filter((a: any) => a.status === 'present').length / attendance.length) * 100) : 0

@@ -15,7 +15,7 @@ export default function OnboardingPage() {
   const [form, setForm] = useState({
     full_name: '', phone: '',
     address1: '', address2: '', state: '', country: '',
-    dob: '', sub_team: '',
+    dob: '', anniversary: '', sub_team: '',
     password: '', confirm_password: ''
   })
 
@@ -25,7 +25,7 @@ export default function OnboardingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // First check invites table for role and branch
+      // Check invites table first — this is the source of truth for role and branch
       const { data: invite } = await supabase
         .from('invites')
         .select('role, branch, full_name')
@@ -35,18 +35,22 @@ export default function OnboardingPage() {
         .single()
 
       if (invite) {
-        if (invite.role) setUserRole(invite.role)
+        const role = invite.role || 'volunteer'
+        setUserRole(role)
         if (invite.branch) setBranchLabel(invite.branch)
-        if (invite.full_name) setForm(f => ({ ...f, full_name: invite.full_name }))
+        // Only pre-fill name for HOD and supervisor — members fill their own
+        if (invite.full_name && (role === 'head' || role === 'supervisor')) {
+          setForm(f => ({ ...f, full_name: invite.full_name }))
+        }
 
-        // Update profile with correct role and branch from invite
+        // Update profile immediately with correct role and branch
         await supabase.from('profiles').update({
-          role: invite.role,
-          branch: invite.branch,
-          full_name: invite.full_name
+          role: role,
+          branch: invite.branch || null,
+          full_name: (role === 'head' || role === 'supervisor') ? (invite.full_name || '') : ''
         }).eq('id', user.id)
       } else {
-        // Fall back to profile
+        // Fallback to profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('branch, full_name, role')
@@ -75,11 +79,9 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Set password
     const { error: passErr } = await supabase.auth.updateUser({ password: form.password })
     if (passErr) { setError(passErr.message); setLoading(false); return }
 
-    // Save profile
     const { error: upErr } = await supabase.from('profiles').update({
       full_name: form.full_name,
       phone: form.phone,
@@ -92,14 +94,18 @@ export default function OnboardingPage() {
 
     if (upErr) { setError(upErr.message); setLoading(false); return }
 
-    // Route by role
     if (userRole === 'super_admin') { router.push('/super'); return }
     if (userRole === 'head' || userRole === 'supervisor') { router.push('/admin'); return }
 
-    // Create probation case for volunteers only
+    // Probation case for volunteers only
     const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
     if (org) {
-      await supabase.from('probation_cases').insert({ volunteer_id: user.id, org_id: org.id, status: 'active', current_week: 1 })
+      await supabase.from('probation_cases').insert({
+        volunteer_id: user.id,
+        org_id: org.id,
+        status: 'active',
+        current_week: 1
+      })
     }
     router.push('/dashboard')
   }
@@ -113,21 +119,26 @@ export default function OnboardingPage() {
     fontFamily: 'inherit', outline: 'none', marginBottom: 10
   }
   const lbl: React.CSSProperties = {
-    fontSize: 12, fontWeight: 500, color: '#7B1818',
-    display: 'block', marginBottom: 4
+    fontSize: 12, fontWeight: 500, color: '#7B1818', display: 'block', marginBottom: 4
   }
   const divider: React.CSSProperties = {
     fontSize: 11, fontWeight: 600, color: '#7B1818',
     textTransform: 'uppercase', letterSpacing: '0.08em',
-    margin: '16px 0 10px', paddingTop: 8,
+    margin: '14px 0 10px', paddingTop: 8,
     borderTop: '0.5px solid var(--color-border-tertiary)'
   }
+
+  const isHOD = userRole === 'head' || userRole === 'supervisor'
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: '#1A1A1A', padding: '13px 16px 11px' }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 2 }}>Create your profile</div>
-        <div style={{ fontSize: 11, color: '#888' }}>Fill in your details to get started</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 2 }}>
+          {isHOD ? 'Set up your HOD account' : 'Create your profile'}
+        </div>
+        <div style={{ fontSize: 11, color: '#888' }}>
+          {isHOD ? 'Fill in your details to access your dashboard' : 'Fill in your details to get started'}
+        </div>
       </div>
       <div style={{ flex: 1, background: 'var(--color-background-secondary)', padding: 14 }}>
         {branchLabel && (
@@ -138,6 +149,7 @@ export default function OnboardingPage() {
         <form onSubmit={handleSubmit}>
           <label style={lbl}>Full name *</label>
           <input style={inp} value={form.full_name} onChange={e => upd('full_name', e.target.value)} placeholder="Your full name" />
+
           <label style={lbl}>Phone number *</label>
           <input style={inp} type="tel" value={form.phone} onChange={e => upd('phone', e.target.value)} placeholder="e.g. 08031234567" />
 
@@ -155,7 +167,10 @@ export default function OnboardingPage() {
           <label style={lbl}>Date of birth</label>
           <input style={inp} type="date" value={form.dob} onChange={e => upd('dob', e.target.value)} />
 
-          {(userRole === 'volunteer' || userRole === '') && (
+          <label style={lbl}>Wedding anniversary <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(if applicable)</span></label>
+          <input style={inp} type="date" value={form.anniversary} onChange={e => upd('anniversary', e.target.value)} />
+
+          {!isHOD && (
             <>
               <label style={lbl}>Sub-team</label>
               <select style={inp} value={form.sub_team} onChange={e => upd('sub_team', e.target.value)}>
@@ -175,7 +190,8 @@ export default function OnboardingPage() {
               onChange={e => upd('password', e.target.value)}
               placeholder="Minimum 6 characters"
             />
-            <button type="button" onClick={() => setShowPassword(s => !s)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-secondary)' }}>
+            <button type="button" onClick={() => setShowPassword(s => !s)}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-secondary)' }}>
               {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
@@ -186,8 +202,9 @@ export default function OnboardingPage() {
             <div style={{ background: 'var(--color-background-danger)', border: '1px solid var(--color-border-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>
           )}
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
-            {loading ? 'Saving…' : 'Save and enter dashboard'}
+          <button type="submit" disabled={loading}
+            style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+            {loading ? 'Saving…' : isHOD ? 'Save and go to dashboard' : 'Save and enter dashboard'}
           </button>
         </form>
       </div>
