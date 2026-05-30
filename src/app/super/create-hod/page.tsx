@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 const BRANCHES = ['Lagos Mainland — Nigeria','Lagos Island — Nigeria','Port Harcourt — Nigeria','Abuja — Nigeria','Ghana','UK — London','UK — Ireland','Houston — USA']
 
 export default function CreateHODPage() {
-  const [form, setForm] = useState({ full_name: '', email: '', branch: '', role: 'head' })
+  const [form, setForm] = useState({ full_name: '', email: '', branch: '' })
   const [sending, setSending] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -27,7 +27,7 @@ export default function CreateHODPage() {
     const { error: invErr } = await supabase.from('invites').insert({
       org_id: org.id,
       email: form.email,
-      role: form.role,
+      role: 'head',
       branch: form.branch,
       full_name: form.full_name,
       invited_by: (await supabase.auth.getUser()).data.user?.id,
@@ -40,7 +40,7 @@ export default function CreateHODPage() {
       email: form.email,
       options: {
         emailRedirectTo: `${window.location.origin}/onboarding`,
-        data: { role: form.role, full_name: form.full_name, branch: form.branch }
+        data: { role: 'head', full_name: form.full_name, branch: form.branch }
       }
     })
     if (otpErr) { setError(otpErr.message); setSending(false); return }
@@ -83,11 +83,7 @@ export default function CreateHODPage() {
             <option value="">Select branch</option>
             {BRANCHES.map(b => <option key={b}>{b}</option>)}
           </select>
-          <label style={S.lbl}>Role</label>
-          <select style={S.inp} value={form.role} onChange={e => upd('role', e.target.value)}>
-            <option value="head">Head of Department</option>
-            <option value="supervisor">Sub-team Lead</option>
-          </select>
+
           {error && <div style={{ background: 'var(--color-background-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>}
           <button type="submit" disabled={sending} style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>{sending ? 'Sending…' : 'Create and send invite'}</button>
           <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>HOD will receive an email with setup instructions.</p>
