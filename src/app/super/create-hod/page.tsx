@@ -18,6 +18,24 @@ export default function CreateHODPage() {
     if (!form.full_name || !form.email || !form.branch) { setError('All fields are required'); return }
     setSending(true); setError('')
     const supabase = createClient()
+
+    // Get org id
+    const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
+    if (!org) { setError('Organisation not found'); setSending(false); return }
+
+    // Save invite record first with role and branch
+    const { error: invErr } = await supabase.from('invites').insert({
+      org_id: org.id,
+      email: form.email,
+      role: form.role,
+      branch: form.branch,
+      full_name: form.full_name,
+      invited_by: (await supabase.auth.getUser()).data.user?.id,
+      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    })
+    if (invErr) { setError(invErr.message); setSending(false); return }
+
+    // Send magic link
     const { error: otpErr } = await supabase.auth.signInWithOtp({
       email: form.email,
       options: {
@@ -26,10 +44,17 @@ export default function CreateHODPage() {
       }
     })
     if (otpErr) { setError(otpErr.message); setSending(false); return }
+
     setSuccess(true); setSending(false)
   }
 
-  const S = { page: { minHeight: '100vh', display: 'flex', flexDirection: 'column' as const }, topbar: { background: '#1A1A1A', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }, body: { flex: 1, padding: 14, background: 'var(--color-background-secondary)' }, lbl: { fontSize: 12, fontWeight: 500, color: '#7B1818', display: 'block', marginBottom: 4 } as React.CSSProperties, inp: { width: '100%', padding: '10px 12px', border: '1px solid var(--color-border-tertiary)', borderRadius: 10, fontSize: 13, color: 'var(--color-text-primary)', background: 'var(--color-background-primary)', fontFamily: 'inherit', outline: 'none', marginBottom: 10 } as React.CSSProperties }
+  const S = {
+    page: { minHeight: '100vh', display: 'flex', flexDirection: 'column' as const },
+    topbar: { background: '#1A1A1A', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 },
+    body: { flex: 1, padding: 14, background: 'var(--color-background-secondary)' },
+    lbl: { fontSize: 12, fontWeight: 500, color: '#7B1818', display: 'block', marginBottom: 4 } as React.CSSProperties,
+    inp: { width: '100%', padding: '10px 12px', border: '1px solid var(--color-border-tertiary)', borderRadius: 10, fontSize: 13, color: 'var(--color-text-primary)', background: 'var(--color-background-primary)', fontFamily: 'inherit', outline: 'none', marginBottom: 10 } as React.CSSProperties
+  }
 
   if (success) return (
     <div style={S.page}>
