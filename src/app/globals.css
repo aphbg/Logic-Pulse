@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+:root {
+  --red: #B71C1C;
+  --red2: #C62828;
+  --blk: #1A1A1A;
+  --blk2: #2D2D2D;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full py-3 px-4 rounded-xl font-medium text-sm text-white cursor-pointer border-none;
+    background: var(--red);
+  }
+  .btn-primary:active { opacity: 0.9; }
+
+  .input-field {
+    @apply w-full px-3 py-2.5 rounded-xl text-sm border outline-none;
+    border-color: #e5e5e5;
+    background: var(--color-background-primary, white);
+    color: var(--color-text-primary, #1A1A1A);
+  }
+  .input-field:focus { border-color: var(--red); }
+
+  .page-body {
+    @apply flex-1 p-4 overflow-y-auto;
+    background: var(--color-background-secondary, #FAFAFA);
+  }
+
+  .card {
+    @apply rounded-xl p-3;
+    background: var(--color-background-primary, white);
+    border: 0.5px solid var(--color-border-tertiary, #E5E5E5);
+  }
+
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-widest mb-2;
+    color: #7B1818;
+    letter-spacing: 0.08em;
+  }
+}
