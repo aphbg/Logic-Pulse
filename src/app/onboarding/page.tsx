@@ -10,7 +10,6 @@ export default function OnboardingPage() {
   const [ready, setReady] = useState(false)
   const [branchLabel, setBranchLabel] = useState('')
   const [userRole, setUserRole] = useState('volunteer')
-  const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -22,38 +21,48 @@ export default function OnboardingPage() {
   })
 
   useEffect(() => {
-    const supabase = createClient()
+    async function init() {
+      const supabase = createClient()
 
-    // Listen for auth state change — this fires when magic link token is exchanged
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        await loadProfile(session.user)
-      }
-      if (event === 'INITIAL_SESSION') {
-        if (session?.user) {
-          await loadProfile(session.user)
-        } else {
-          // No session — check if there is a hash in the URL (magic link)
-          // Give it a moment to process
-          setTimeout(async () => {
-            const { data: { session: s } } = await supabase.auth.getSession()
-            if (s?.user) {
-              await loadProfile(s.user)
-            } else {
-              router.push('/login')
+      // Step 1: Check if there is a hash in the URL with tokens (magic link)
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash
+        if (hash && hash.includes('access_token')) {
+          // Parse tokens from hash
+          const params = new URLSearchParams(hash.substring(1))
+          const access_token = params.get('access_token')
+          const refresh_token = params.get('refresh_token')
+
+          if (access_token && refresh_token) {
+            // Set the session manually from the URL tokens
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token
+            })
+            if (!error && data.user) {
+              // Clear the hash from URL for cleanliness
+              window.history.replaceState(null, '', window.location.pathname)
+              await loadProfile(data.user, supabase)
+              return
             }
-          }, 2000)
+          }
         }
       }
-    })
 
-    return () => subscription.unsubscribe()
+      // Step 2: No hash — check if already have a session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        await loadProfile(session.user, supabase)
+        return
+      }
+
+      // Step 3: No session at all — redirect to login
+      router.push('/login')
+    }
+    init()
   }, [router])
 
-  async function loadProfile(user: any) {
-    const supabase = createClient()
-    setUserId(user.id)
-
+  async function loadProfile(user: any, supabase: any) {
     // Check invites table for role and branch
     const { data: invite } = await supabase
       .from('invites')
@@ -70,7 +79,6 @@ export default function OnboardingPage() {
       if (invite.full_name && (role === 'head' || role === 'supervisor')) {
         setForm(f => ({ ...f, full_name: invite.full_name }))
       }
-      // Update profile with correct role and branch immediately
       await supabase.from('profiles').update({
         role,
         branch: invite.branch || null,
@@ -88,7 +96,6 @@ export default function OnboardingPage() {
       }
       if (profile?.role) setUserRole(profile.role)
     }
-
     setReady(true)
   }
 
@@ -144,7 +151,7 @@ export default function OnboardingPage() {
   const lbl: React.CSSProperties = {
     fontSize: 12, fontWeight: 500, color: '#7B1818', display: 'block', marginBottom: 4
   }
-  const div: React.CSSProperties = {
+  const divStyle: React.CSSProperties = {
     fontSize: 11, fontWeight: 600, color: '#7B1818',
     textTransform: 'uppercase', letterSpacing: '0.08em',
     margin: '14px 0 10px', paddingTop: 8,
@@ -153,7 +160,6 @@ export default function OnboardingPage() {
 
   const isHOD = userRole === 'head' || userRole === 'supervisor'
 
-  // Loading state while waiting for session
   if (!ready) return (
     <div style={{ minHeight: '100vh', background: '#1A1A1A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <div style={{ fontSize: 32 }}>⚡</div>
@@ -183,7 +189,7 @@ export default function OnboardingPage() {
           <input style={inp} value={form.full_name} onChange={e => upd('full_name', e.target.value)} placeholder="Your full name" />
           <label style={lbl}>Phone number *</label>
           <input style={inp} type="tel" value={form.phone} onChange={e => upd('phone', e.target.value)} placeholder="e.g. 08031234567" />
-          <div style={div}>Home address</div>
+          <div style={divStyle}>Home address</div>
           <label style={lbl}>Street address</label>
           <input style={inp} value={form.address1} onChange={e => upd('address1', e.target.value)} placeholder="House number and street name" />
           <label style={lbl}>Address line 2 <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span></label>
@@ -192,7 +198,7 @@ export default function OnboardingPage() {
           <input style={inp} value={form.state} onChange={e => upd('state', e.target.value)} placeholder="e.g. Lagos, Greater London" />
           <label style={lbl}>Country</label>
           <input style={inp} value={form.country} onChange={e => upd('country', e.target.value)} placeholder="e.g. Nigeria, United Kingdom" />
-          <div style={div}>Personal details</div>
+          <div style={divStyle}>Personal details</div>
           <label style={lbl}>Date of birth</label>
           <input style={inp} type="date" value={form.dob} onChange={e => upd('dob', e.target.value)} />
           {!isHOD && (
@@ -204,7 +210,7 @@ export default function OnboardingPage() {
               </select>
             </>
           )}
-          <div style={div}>Set your password</div>
+          <div style={divStyle}>Set your password</div>
           <label style={lbl}>Password *</label>
           <div style={{ position: 'relative', marginBottom: 10 }}>
             <input style={{ ...inp, marginBottom: 0, paddingRight: 44 }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => upd('password', e.target.value)} placeholder="Minimum 6 characters" />
