@@ -17,11 +17,11 @@ export default function DashboardPage() {
       if (!user) { router.push('/login'); return }
       const [{ data: profile }, { data: pc }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('probation_cases').select('*').eq('volunteer_id', user.id).eq('status', 'active').single()
+        supabase.from('probation_cases').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).single()
       ])
       if (!profile?.onboarding_complete) { router.push('/onboarding'); return }
       const [{ data: badges }, { data: assessments }, { count: reportCount }] = await Promise.all([
-        supabase.from('volunteer_badges').select('*, badge:badges(*)').eq('volunteer_id', user.id),
+        supabase.from('volunteer_badges').select('*, badge:badges(*)').eq('user_id', user.id),
         supabase.from('supervisor_assessments').select('*').eq('case_id', pc?.id).order('assessed_at', { ascending: false }).limit(1),
         supabase.from('checkin_submissions').select('*', { count: 'exact', head: true }).eq('case_id', pc?.id)
       ])
@@ -45,11 +45,12 @@ export default function DashboardPage() {
   const progress = Math.round((week / 8) * 100)
   const subTeamLabel = profile.sub_team?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || ''
 
-  const S = { page: { minHeight: '100vh', display: 'flex', flexDirection: 'column' as const }, hdr: { background: '#1A1A1A', padding: '14px 16px 12px' }, body: { flex: 1, padding: 14, background: 'var(--color-background-secondary, #FAFAFA)', overflowY: 'auto' as const } }
+  const S = { page: { minHeight: '100vh', display: 'flex', flexDirection: 'column' as const, background: '#1A1A1A' }, hdr: { background: '#1A1A1A', padding: '14px 16px 12px', maxWidth: 480, margin: '0 auto', width: '100%' }, body: { flex: 1, padding: 14, background: 'var(--color-background-secondary, #FAFAFA)', overflowY: 'auto' as const }, wrap: { maxWidth: 480, margin: '0 auto', width: '100%', background: 'var(--color-background-secondary, #FAFAFA)', minHeight: '100vh', display: 'flex', flexDirection: 'column' as const } }
 
   return (
-    <div style={S.page}>
-      <div style={S.hdr}>
+    <div style={{ minHeight: '100vh', background: '#1A1A1A', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 480, background: 'var(--color-background-secondary)', display: 'flex', flexDirection: 'column' as const, minHeight: '100vh' }}>
+      <div style={{ background: '#1A1A1A', padding: '14px 16px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
             <div style={{ fontSize: 11, color: '#888' }}>Member{subTeamLabel ? ` · ${subTeamLabel}` : ''}</div>
@@ -65,7 +66,7 @@ export default function DashboardPage() {
           <span style={{ fontSize: 11, color: '#bbb' }}>{progress}%</span>
         </div>
       </div>
-      <div style={S.body}>
+      <div style={{ flex: 1, padding: 14, background: 'var(--color-background-secondary, #FAFAFA)', overflowY: 'auto' as const }}>
         <Link href="/dashboard/attendance" style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#B71C1C', border: 'none', borderRadius: 12, padding: '14px 16px', marginBottom: 14, cursor: 'pointer', textDecoration: 'none' }}>
           <div style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.15)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📍</div>
           <div style={{ flex: 1 }}>
@@ -126,6 +127,7 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
