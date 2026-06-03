@@ -144,7 +144,11 @@ export default function OnboardingPage() {
     const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
     if (org) {
       await supabase.from('probation_cases').insert({
-        volunteer_id: user.id, org_id: org.id, status: 'active', current_week: 1
+        user_id: user.id,
+        created_by: user.id,
+        status: 'active',
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date(Date.now() + 56 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       })
     }
     router.push('/dashboard')
