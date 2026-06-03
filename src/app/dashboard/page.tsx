@@ -56,7 +56,7 @@ export default function DashboardPage() {
             <div style={{ fontSize: 11, color: '#888' }}>Member{subTeamLabel ? ` · ${subTeamLabel}` : ''}</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: 'white', letterSpacing: '-0.2px' }}>{profile.full_name}</div>
           </div>
-          <button onClick={logout} style={{ width: 32, height: 32, background: '#2D2D2D', borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⬚</button>
+          <button onClick={logout} style={{ background: '#2D2D2D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, fontSize: 11, color: '#999', fontFamily: 'inherit' }}>⬚ Sign out</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: '#bbb', whiteSpace: 'nowrap' }}>Probation · Week {week} of 8</span>
