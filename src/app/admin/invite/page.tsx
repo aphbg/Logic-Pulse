@@ -65,7 +65,7 @@ export default function InvitePage() {
       const { error: otpErr } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/onboarding`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: { role: 'volunteer', branch }
         }
       })
