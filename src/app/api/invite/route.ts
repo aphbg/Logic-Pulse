@@ -12,7 +12,7 @@ function generateTempPassword(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { emails, role, branch, full_name, org_id, invited_by } = await request.json()
+    const { emails, role, branch, full_name, org_id: orgIdParam, invited_by } = await request.json()
 
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return NextResponse.json({ error: 'No emails provided' }, { status: 400 })
@@ -41,6 +41,13 @@ export async function POST(request: NextRequest) {
       if (userError) {
         results.push({ email, success: false, error: userError.message })
         continue
+      }
+
+      // Get org_id if not passed
+      let org_id = orgIdParam
+      if (!org_id) {
+        const { data: org } = await supabaseAdmin.from('organisations').select('id').eq('slug', 'logic-church').single()
+        org_id = org?.id
       }
 
       // Save invite record
