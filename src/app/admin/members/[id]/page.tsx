@@ -21,6 +21,8 @@ export default function MemberDetailPage() {
   const [statusUpdate, setStatusUpdate] = useState('')
   const [roleUpdate, setRoleUpdate] = useState('')
   const [roleSaving, setRoleSaving] = useState(false)
+  const [subTeamUpdate, setSubTeamUpdate] = useState('')
+  const [subTeamSaving, setSubTeamSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -69,6 +71,16 @@ export default function MemberDetailPage() {
     await loadData()
     setRoleSaving(false)
     setRoleUpdate('')
+  }
+
+  async function updateSubTeam() {
+    if (!subTeamUpdate) return
+    setSubTeamSaving(true)
+    const supabase = createClient()
+    await supabase.from('profiles').update({ sub_team: subTeamUpdate.toLowerCase().replace(/ /g, '_') }).eq('id', id)
+    await loadData()
+    setSubTeamSaving(false)
+    setSubTeamUpdate('')
   }
 
   const attPct = attendance.length > 0 ? Math.round((attendance.filter((a: any) => a.status === 'present').length / attendance.length) * 100) : 0
