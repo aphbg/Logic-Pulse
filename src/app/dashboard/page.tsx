@@ -17,11 +17,11 @@ export default function DashboardPage() {
       if (!user) { router.push('/login'); return }
       const [{ data: profile }, { data: pc }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('probation_cases').select('*').eq('user_id', user.id).single()
+        supabase.from('probation_cases').select('*').eq('volunteer_id', user.id).eq('status', 'active').single()
       ])
       if (!profile?.onboarding_complete) { router.push('/onboarding'); return }
       const [{ data: badges }, { data: assessments }, { count: reportCount }] = await Promise.all([
-        supabase.from('volunteer_badges').select('*, badge:badges(*)').eq('user_id', user.id),
+        supabase.from('volunteer_badges').select('*, badge:badges(*)').eq('volunteer_id', user.id),
         supabase.from('supervisor_assessments').select('*').eq('case_id', pc?.id).order('assessed_at', { ascending: false }).limit(1),
         supabase.from('checkin_submissions').select('*', { count: 'exact', head: true }).eq('case_id', pc?.id)
       ])
