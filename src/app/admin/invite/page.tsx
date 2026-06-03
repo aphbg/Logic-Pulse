@@ -10,25 +10,22 @@ export default function InvitePage() {
   const [subTeam, setSubTeam] = useState('')
   const [branch, setBranch] = useState('')
   const [orgId, setOrgId] = useState('')
+  const [userId, setUserId] = useState('')
   const [sending, setSending] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    async function loadProfile() {
+    async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('branch, org_id')
-        .eq('id', user.id)
-        .single()
+      if (user) setUserId(user.id)
+      const { data: profile } = await supabase.from('profiles').select('branch, org_id').eq('id', user?.id).single()
       if (profile?.branch) setBranch(profile.branch)
       if (profile?.org_id) setOrgId(profile.org_id)
     }
-    loadProfile()
+    load()
   }, [])
 
   function parseEmails(raw: string): string[] {
@@ -45,39 +42,23 @@ export default function InvitePage() {
     const emailList = parseEmails(emails)
     if (emailList.length === 0) { setError('Enter at least one valid email address'); return }
     setSending(true); setError('')
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
 
-    let failed = 0
-    for (const email of emailList) {
-      // Save invite record
-      await supabase.from('invites').insert({
-        org_id: orgId,
-        email,
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        emails: emailList,
         role: 'volunteer',
         branch,
-        sub_team: subTeam ? subTeam.toLowerCase().replace(/ /g, '_') : null,
-        invited_by: user?.id,
-        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+        org_id: orgId,
+        invited_by: userId
       })
+    })
 
-      // Send magic link
-      const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { role: 'volunteer', branch }
-        }
-      })
-      if (otpErr) failed++
-    }
+    const data = await res.json()
+    if (!res.ok || data.error) { setError(data.error || 'Failed to send invites'); setSending(false); return }
 
-    if (failed > 0) {
-      setError(`${failed} invite(s) failed to send. Others were sent successfully.`)
-    } else {
-      setSuccess(true)
-    }
-    setSending(false)
+    setSuccess(true); setSending(false)
   }
 
   const inp: React.CSSProperties = {
@@ -102,7 +83,7 @@ export default function InvitePage() {
         <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Invites sent</div>
         <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 20 }}>
-          {count} invite{count !== 1 ? 's' : ''} sent to {branch}. Each person will receive a unique link valid for 48 hours.
+          {count} member{count !== 1 ? 's' : ''} will receive an email with their login details.
         </div>
         <Link href="/admin" style={{ padding: '11px 24px', background: '#B71C1C', color: 'white', borderRadius: 11, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>Back to dashboard</Link>
       </div>
@@ -123,7 +104,7 @@ export default function InvitePage() {
           </div>
         )}
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 13, lineHeight: 1.5 }}>
-          Everyone joins as a member on probation. You can promote anyone to sub-team lead from their profile at any time.
+          Each person will receive an email with a temporary password. They sign in and complete their profile on first login.
         </p>
         <form onSubmit={handleInvite}>
           <label style={lbl}>Email address(es)</label>
@@ -138,13 +119,11 @@ export default function InvitePage() {
               {count} email{count !== 1 ? 's' : ''} detected
             </span>
           )}
-
           <label style={lbl}>Assign sub-team <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span></label>
           <select style={inp} value={subTeam} onChange={e => setSubTeam(e.target.value)}>
             <option value="">Member chooses during onboarding</option>
             {SUBTEAMS.map(s => <option key={s}>{s}</option>)}
           </select>
-
           {error && (
             <div style={{ background: 'var(--color-background-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>
           )}
@@ -152,9 +131,6 @@ export default function InvitePage() {
             style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
             {sending ? 'Sending…' : `Send invite${count > 1 ? `s (${count})` : ''}`}
           </button>
-          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>
-            Each person receives a unique link valid for 48 hours.
-          </p>
         </form>
       </div>
     </div>
