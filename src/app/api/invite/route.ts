@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
       // Send email via Resend SMTP
       await transporter.sendMail({
-        from: 'Logic Pulse <onboarding@resend.dev>',
+        from: 'Logic Pulse <noreply@jovilex.com>',
         to: email,
         subject: 'You have been invited to Logic Pulse',
         html: `
