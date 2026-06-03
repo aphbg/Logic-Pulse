@@ -39,7 +39,7 @@ export default function CreateHODPage() {
     const { error: otpErr } = await supabase.auth.signInWithOtp({
       email: form.email,
       options: {
-        emailRedirectTo: `${window.location.origin}/onboarding`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: { role: 'head', full_name: form.full_name, branch: form.branch }
       }
     })
