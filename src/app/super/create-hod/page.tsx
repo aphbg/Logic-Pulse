@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
@@ -7,9 +7,22 @@ const BRANCHES = ['Lagos Mainland — Nigeria','Lagos Island — Nigeria','Port 
 
 export default function CreateHODPage() {
   const [form, setForm] = useState({ full_name: '', email: '', branch: '' })
+  const [orgId, setOrgId] = useState('')
+  const [userId, setUserId] = useState('')
   const [sending, setSending] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+      const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
+      if (org) setOrgId(org.id)
+    }
+    load()
+  }, [])
 
   function upd(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -17,33 +30,25 @@ export default function CreateHODPage() {
     e.preventDefault()
     if (!form.full_name || !form.email || !form.branch) { setError('All fields are required'); return }
     setSending(true); setError('')
-    const supabase = createClient()
 
-    // Get org id
-    const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
-    if (!org) { setError('Organisation not found'); setSending(false); return }
-
-    // Save invite record first with role and branch
-    const { error: invErr } = await supabase.from('invites').insert({
-      org_id: org.id,
-      email: form.email,
-      role: 'head',
-      branch: form.branch,
-      full_name: form.full_name,
-      invited_by: (await supabase.auth.getUser()).data.user?.id,
-      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        emails: [form.email],
+        role: 'head',
+        branch: form.branch,
+        full_name: form.full_name,
+        org_id: orgId,
+        invited_by: userId
+      })
     })
-    if (invErr) { setError(invErr.message); setSending(false); return }
 
-    // Send magic link
-    const { error: otpErr } = await supabase.auth.signInWithOtp({
-      email: form.email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: { role: 'head', full_name: form.full_name, branch: form.branch }
-      }
-    })
-    if (otpErr) { setError(otpErr.message); setSending(false); return }
+    const data = await res.json()
+    if (!res.ok || data.error) { setError(data.error || 'Failed to send invite'); setSending(false); return }
+
+    const result = data.results?.[0]
+    if (!result?.success) { setError('Failed to create account. Email may already exist.'); setSending(false); return }
 
     setSuccess(true); setSending(false)
   }
@@ -62,7 +67,9 @@ export default function CreateHODPage() {
       <div style={{ ...S.body, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Invite sent</div>
-        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 20 }}>{form.full_name} will receive an email with setup instructions for the {form.branch} branch.</div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 20 }}>
+          {form.full_name} will receive an email with their login details for the {form.branch} branch.
+        </div>
         <Link href="/super" style={{ padding: '11px 24px', background: '#B71C1C', color: 'white', borderRadius: 11, textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>Back to dashboard</Link>
       </div>
     </div>
@@ -72,7 +79,9 @@ export default function CreateHODPage() {
     <div style={S.page}>
       <div style={S.topbar}><Link href="/super" style={{ color: '#999', fontSize: 18, textDecoration: 'none' }}>←</Link><span style={{ fontSize: 13, fontWeight: 500, color: 'white' }}>Create head of department</span></div>
       <div style={S.body}>
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>Create an HOD account. They will receive an email with a link to set their password and access their dashboard.</p>
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+          HOD will receive an email with a temporary password to sign in and complete their profile.
+        </p>
         <form onSubmit={handleCreate}>
           <label style={S.lbl}>Full name *</label>
           <input style={S.inp} value={form.full_name} onChange={e => upd('full_name', e.target.value)} placeholder="HOD's full name" />
@@ -83,10 +92,10 @@ export default function CreateHODPage() {
             <option value="">Select branch</option>
             {BRANCHES.map(b => <option key={b}>{b}</option>)}
           </select>
-
           {error && <div style={{ background: 'var(--color-background-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>}
-          <button type="submit" disabled={sending} style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>{sending ? 'Sending…' : 'Create and send invite'}</button>
-          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8 }}>HOD will receive an email with setup instructions.</p>
+          <button type="submit" disabled={sending} style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+            {sending ? 'Creating…' : 'Create and send invite'}
+          </button>
         </form>
       </div>
     </div>
