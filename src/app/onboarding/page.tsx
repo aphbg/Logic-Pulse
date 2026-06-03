@@ -50,7 +50,17 @@ export default function OnboardingPage() {
       }
 
       // Step 2: No hash — check if already have a session
-      const { data: { session } } = await supabase.auth.getSession()
+      // Try up to 3 times with a short delay — session cookie may not be readable immediately
+      let session = null
+      for (let i = 0; i < 3; i++) {
+        const { data } = await supabase.auth.getSession()
+        if (data.session?.user) {
+          session = data.session
+          break
+        }
+        if (i < 2) await new Promise(r => setTimeout(r, 1000))
+      }
+
       if (session?.user) {
         await loadProfile(session.user, supabase)
         return
