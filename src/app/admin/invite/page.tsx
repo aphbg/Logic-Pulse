@@ -3,11 +3,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
-const SUBTEAMS = ['Camera', 'Roving', 'Live Streaming', 'Lighting', 'Multimedia']
-
 export default function InvitePage() {
   const [emails, setEmails] = useState('')
-  const [subTeam, setSubTeam] = useState('')
   const [branch, setBranch] = useState('')
   const [orgId, setOrgId] = useState('')
   const [userId, setUserId] = useState('')
@@ -119,11 +116,7 @@ export default function InvitePage() {
               {count} email{count !== 1 ? 's' : ''} detected
             </span>
           )}
-          <label style={lbl}>Assign sub-team <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span></label>
-          <select style={inp} value={subTeam} onChange={e => setSubTeam(e.target.value)}>
-            <option value="">Member chooses during onboarding</option>
-            {SUBTEAMS.map(s => <option key={s}>{s}</option>)}
-          </select>
+
           {error && (
             <div style={{ background: 'var(--color-background-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>
           )}
