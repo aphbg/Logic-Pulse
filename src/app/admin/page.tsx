@@ -52,7 +52,7 @@ export default function AdminPage() {
           </div>
           <div style={{ display: 'flex', gap: 7 }}>
             <Link href="/admin/invite" style={{ width: 32, height: 32, background: '#B71C1C', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: 18 }}>+</Link>
-            <button onClick={logout} style={{ width: 32, height: 32, background: '#2D2D2D', borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 14 }}>⬚</button>
+            <button onClick={logout} style={{ background: '#2D2D2D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, fontSize: 11, color: '#999', fontFamily: 'inherit' }}>⬚ Sign out</button>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
