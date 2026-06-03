@@ -28,7 +28,7 @@ export default function AdminPage() {
       if (!p || p.role === 'volunteer') { router.push('/dashboard'); return }
       if (p.role === 'super_admin') { router.push('/super'); return }
       setProfile(p)
-      const { data } = await supabase.from('probation_cases').select('*, volunteer:profiles!probation_cases_volunteer_id_fkey(*)').not('status', 'in', '(released)').order('created_at', { ascending: false })
+      const { data } = await supabase.from('probation_cases').select('*, volunteer:profiles!probation_cases_user_id_fkey(*)').not('status', 'in', '(released)').order('created_at', { ascending: false })
       setCases(data || [])
       setLoading(false)
     }
@@ -42,7 +42,8 @@ export default function AdminPage() {
   const stats = { total: cases.length, active: cases.filter(c => c.status === 'active').length, at_risk: cases.filter(c => c.status === 'at_risk').length, critical: cases.filter(c => c.status === 'critical').length }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#1A1A1A', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 480, background: 'var(--color-background-secondary)', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <div style={{ background: '#1A1A1A', padding: '14px 16px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
@@ -79,7 +80,7 @@ export default function AdminPage() {
           const st = STATUS_STYLE[c.status] || STATUS_STYLE.active
           const initials = c.volunteer?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || '??'
           return (
-            <Link key={c.id} href={`/admin/members/${c.volunteer_id}`} style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 10, padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7, textDecoration: 'none' }}>
+            <Link key={c.id} href={`/admin/members/${c.user_id}`} style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 10, padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7, textDecoration: 'none' }}>
               <div style={{ width: 36, height: 36, background: '#B71C1C', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: 'white', flexShrink: 0 }}>{initials}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -96,6 +97,7 @@ export default function AdminPage() {
           )
         })}
       </div>
+    </div>
     </div>
   )
 }
