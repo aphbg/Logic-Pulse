@@ -114,6 +114,8 @@ export default function OnboardingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.full_name || !form.phone) { setError('Full name and phone are required'); return }
+    if (!isHOD && !form.sub_team) { setError('Please select your sub-team'); return }
+    if (!form.dob) { setError('Date of birth is required'); return }
     if (!form.password) { setError('Please set a password'); return }
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return }
     if (form.password !== form.confirm_password) { setError('Passwords do not match'); return }
@@ -213,11 +215,11 @@ export default function OnboardingPage() {
           <label style={lbl}>Country</label>
           <input style={inp} value={form.country} onChange={e => upd('country', e.target.value)} placeholder="e.g. Nigeria, United Kingdom" />
           <div style={divStyle}>Personal details</div>
-          <label style={lbl}>Date of birth</label>
+          <label style={lbl}>Date of birth *</label>
           <input style={inp} type="date" value={form.dob} onChange={e => upd('dob', e.target.value)} />
           {!isHOD && (
             <>
-              <label style={lbl}>Sub-team</label>
+              <label style={lbl}>Sub-team *</label>
               <select style={inp} value={form.sub_team} onChange={e => upd('sub_team', e.target.value)}>
                 <option value="">Choose your sub-team</option>
                 {SUBTEAMS.map(s => <option key={s}>{s}</option>)}
