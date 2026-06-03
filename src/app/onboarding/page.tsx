@@ -7,62 +7,90 @@ const SUBTEAMS = ['Camera', 'Roving', 'Live Streaming', 'Lighting', 'Multimedia'
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const [ready, setReady] = useState(false)
   const [branchLabel, setBranchLabel] = useState('')
   const [userRole, setUserRole] = useState('volunteer')
+  const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [form, setForm] = useState({
     full_name: '', phone: '',
     address1: '', address2: '', state: '', country: '',
-    dob: '', anniversary: '', sub_team: '',
+    dob: '', sub_team: '',
     password: '', confirm_password: ''
   })
 
   useEffect(() => {
-    async function loadProfile() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+    const supabase = createClient()
 
-      // Check invites table first — this is the source of truth for role and branch
-      const { data: invite } = await supabase
-        .from('invites')
-        .select('role, branch, full_name')
-        .eq('email', user.email)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (invite) {
-        const role = invite.role || 'volunteer'
-        setUserRole(role)
-        if (invite.branch) setBranchLabel(invite.branch)
-        // Only pre-fill name for HOD and supervisor — members fill their own
-        if (invite.full_name && (role === 'head' || role === 'supervisor')) {
-          setForm(f => ({ ...f, full_name: invite.full_name }))
-        }
-
-        // Update profile immediately with correct role and branch
-        await supabase.from('profiles').update({
-          role: role,
-          branch: invite.branch || null,
-          full_name: (role === 'head' || role === 'supervisor') ? (invite.full_name || '') : ''
-        }).eq('id', user.id)
-      } else {
-        // Fallback to profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('branch, full_name, role')
-          .eq('id', user.id)
-          .single()
-        if (profile?.branch) setBranchLabel(profile.branch)
-        if (profile?.full_name) setForm(f => ({ ...f, full_name: profile.full_name }))
-        if (profile?.role) setUserRole(profile.role)
+    // Listen for auth state change — this fires when magic link token is exchanged
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadProfile(session.user)
       }
-    }
-    loadProfile()
+      if (event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          await loadProfile(session.user)
+        } else {
+          // No session — check if there is a hash in the URL (magic link)
+          // Give it a moment to process
+          setTimeout(async () => {
+            const { data: { session: s } } = await supabase.auth.getSession()
+            if (s?.user) {
+              await loadProfile(s.user)
+            } else {
+              router.push('/login')
+            }
+          }, 2000)
+        }
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [router])
+
+  async function loadProfile(user: any) {
+    const supabase = createClient()
+    setUserId(user.id)
+
+    // Check invites table for role and branch
+    const { data: invite } = await supabase
+      .from('invites')
+      .select('role, branch, full_name')
+      .eq('email', user.email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (invite) {
+      const role = invite.role || 'volunteer'
+      setUserRole(role)
+      if (invite.branch) setBranchLabel(invite.branch)
+      if (invite.full_name && (role === 'head' || role === 'supervisor')) {
+        setForm(f => ({ ...f, full_name: invite.full_name }))
+      }
+      // Update profile with correct role and branch immediately
+      await supabase.from('profiles').update({
+        role,
+        branch: invite.branch || null,
+        full_name: (role === 'head' || role === 'supervisor') ? (invite.full_name || '') : ''
+      }).eq('id', user.id)
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('branch, full_name, role')
+        .eq('id', user.id)
+        .single()
+      if (profile?.branch) setBranchLabel(profile.branch)
+      if (profile?.full_name && (profile?.role === 'head' || profile?.role === 'supervisor')) {
+        setForm(f => ({ ...f, full_name: profile.full_name }))
+      }
+      if (profile?.role) setUserRole(profile.role)
+    }
+
+    setReady(true)
+  }
 
   function upd(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -72,7 +100,6 @@ export default function OnboardingPage() {
     if (!form.password) { setError('Please set a password'); return }
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return }
     if (form.password !== form.confirm_password) { setError('Passwords do not match'); return }
-
     setLoading(true)
     setError('')
     const supabase = createClient()
@@ -97,14 +124,10 @@ export default function OnboardingPage() {
     if (userRole === 'super_admin') { router.push('/super'); return }
     if (userRole === 'head' || userRole === 'supervisor') { router.push('/admin'); return }
 
-    // Probation case for volunteers only
     const { data: org } = await supabase.from('organisations').select('id').eq('slug', 'logic-church').single()
     if (org) {
       await supabase.from('probation_cases').insert({
-        volunteer_id: user.id,
-        org_id: org.id,
-        status: 'active',
-        current_week: 1
+        volunteer_id: user.id, org_id: org.id, status: 'active', current_week: 1
       })
     }
     router.push('/dashboard')
@@ -121,7 +144,7 @@ export default function OnboardingPage() {
   const lbl: React.CSSProperties = {
     fontSize: 12, fontWeight: 500, color: '#7B1818', display: 'block', marginBottom: 4
   }
-  const divider: React.CSSProperties = {
+  const div: React.CSSProperties = {
     fontSize: 11, fontWeight: 600, color: '#7B1818',
     textTransform: 'uppercase', letterSpacing: '0.08em',
     margin: '14px 0 10px', paddingTop: 8,
@@ -129,6 +152,15 @@ export default function OnboardingPage() {
   }
 
   const isHOD = userRole === 'head' || userRole === 'supervisor'
+
+  // Loading state while waiting for session
+  if (!ready) return (
+    <div style={{ minHeight: '100vh', background: '#1A1A1A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ fontSize: 32 }}>⚡</div>
+      <div style={{ fontSize: 14, color: 'white', fontWeight: 500 }}>Setting up your account…</div>
+      <div style={{ fontSize: 12, color: '#666' }}>This will only take a moment</div>
+    </div>
+  )
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -149,11 +181,9 @@ export default function OnboardingPage() {
         <form onSubmit={handleSubmit}>
           <label style={lbl}>Full name *</label>
           <input style={inp} value={form.full_name} onChange={e => upd('full_name', e.target.value)} placeholder="Your full name" />
-
           <label style={lbl}>Phone number *</label>
           <input style={inp} type="tel" value={form.phone} onChange={e => upd('phone', e.target.value)} placeholder="e.g. 08031234567" />
-
-          <div style={divider}>Home address</div>
+          <div style={div}>Home address</div>
           <label style={lbl}>Street address</label>
           <input style={inp} value={form.address1} onChange={e => upd('address1', e.target.value)} placeholder="House number and street name" />
           <label style={lbl}>Address line 2 <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span></label>
@@ -162,14 +192,9 @@ export default function OnboardingPage() {
           <input style={inp} value={form.state} onChange={e => upd('state', e.target.value)} placeholder="e.g. Lagos, Greater London" />
           <label style={lbl}>Country</label>
           <input style={inp} value={form.country} onChange={e => upd('country', e.target.value)} placeholder="e.g. Nigeria, United Kingdom" />
-
-          <div style={divider}>Personal details</div>
+          <div style={div}>Personal details</div>
           <label style={lbl}>Date of birth</label>
           <input style={inp} type="date" value={form.dob} onChange={e => upd('dob', e.target.value)} />
-
-          <label style={lbl}>Wedding anniversary <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(if applicable)</span></label>
-          <input style={inp} type="date" value={form.anniversary} onChange={e => upd('anniversary', e.target.value)} />
-
           {!isHOD && (
             <>
               <label style={lbl}>Sub-team</label>
@@ -179,31 +204,18 @@ export default function OnboardingPage() {
               </select>
             </>
           )}
-
-          <div style={divider}>Set your password</div>
+          <div style={div}>Set your password</div>
           <label style={lbl}>Password *</label>
           <div style={{ position: 'relative', marginBottom: 10 }}>
-            <input
-              style={{ ...inp, marginBottom: 0, paddingRight: 44 }}
-              type={showPassword ? 'text' : 'password'}
-              value={form.password}
-              onChange={e => upd('password', e.target.value)}
-              placeholder="Minimum 6 characters"
-            />
-            <button type="button" onClick={() => setShowPassword(s => !s)}
-              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-secondary)' }}>
+            <input style={{ ...inp, marginBottom: 0, paddingRight: 44 }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => upd('password', e.target.value)} placeholder="Minimum 6 characters" />
+            <button type="button" onClick={() => setShowPassword(s => !s)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-secondary)' }}>
               {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
           <label style={lbl}>Confirm password *</label>
           <input style={inp} type="password" value={form.confirm_password} onChange={e => upd('confirm_password', e.target.value)} placeholder="Re-enter your password" />
-
-          {error && (
-            <div style={{ background: 'var(--color-background-danger)', border: '1px solid var(--color-border-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>
-          )}
-
-          <button type="submit" disabled={loading}
-            style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+          {error && <div style={{ background: 'var(--color-background-danger)', border: '1px solid var(--color-border-danger)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-danger)', marginBottom: 8 }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: 12, background: '#B71C1C', color: 'white', border: 'none', borderRadius: 11, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
             {loading ? 'Saving…' : isHOD ? 'Save and go to dashboard' : 'Save and enter dashboard'}
           </button>
         </form>
